@@ -88,6 +88,10 @@
 
                                 //Collapse or Expand
                                 selectedNode.collapsed = !selectedNode.collapsed;
+
+                                if (angular.isFunction(scope[treeId].treeSelectNodeHeadCallBack)) {
+                                    scope[treeId].treeSelectNodeHeadCallBack(selectedNode);
+                                }
                             };
 
                             //if node label clicks,
