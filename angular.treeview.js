@@ -61,15 +61,28 @@
                         dropArg = ' ui-on-Drop="' + treeId + '.onDrop($data, node, node.id)"';
                     }
 
+                    //use custom css class
+                    var collapsedClass = attrs.collapsedClass || 'collapsed';
+                    var expandedClass = attrs.expandedClass || 'expanded';
+                    var normalClass = attrs.normalClass || 'normal';
+
+                    //set click event globally on li element ?
+                    var useSelectNodeFn = false;
+                    if (attrs.useSelectNodeFn) {
+                        useSelectNodeFn = attrs.useSelectNodeFn === 'true'
+                    }
+
+
                     //tree template
                     var template =
                         '<ul>' +
-                        '<li ' + dropArg + ' data-ng-repeat="node in ' + treeModel + '"  ng-switch="node.collapsed">' + '<i class="collapsed" data-ng-show="node.' + nodeChildren + '&& node.collapsed" data-ng-click="' + treeId + '.selectNodeHead(node)"></i>' +
-                        '<i class="expanded" data-ng-show="node.' + nodeChildren + ' && !node.collapsed" data-ng-click="' + treeId + '.selectNodeHead(node)"></i>' +
-                        '<i class="normal" data-ng-show="!node.' + nodeChildren + ' && ' + showLeafs + '"></i> ' +
-                        '<span data-ng-class="node.selected" data-ng-click="' + treeId + '.selectNodeLabel(node)" ng-if="' + showLeafs + '  && !node.' + nodeChildren + '">{{node.' + nodeLabel + '}}</span>' +
-                        '<span data-ng-class="node.selected" data-ng-click="' + treeId + '.selectNodeLabel(node)" ng-if="node.' + nodeChildren + '">{{node.' + nodeLabel + '}}</span>' +
-                        '<div data-ng-hide="node.collapsed" show-leafs="' + showLeafs + '" droppable="' + droppable + '" ' + dropArg + ' data-tree-id="' + treeId + '" data-tree-model="node.' + nodeChildren + '" data-node-id=' + nodeId + ' data-node-label=' + nodeLabel + ' data-node-children=' + nodeChildren + '  ng-switch-when="false"></div>' +
+                        '<li ' + dropArg + ' data-ng-repeat="node in ' + treeModel + '"  ng-switch="node.collapsed" data-ng-click="' + treeId + '.selectNode(node, $event)">' +
+                        '<i class="' + collapsedClass + '" data-ng-show="node.' + nodeChildren + ' && (node.collapsed === true || node.collapsed === undefined)" data-ng-click="' + treeId + '.selectNodeHead(node, $event)"></i>' +
+                        '<i class="' + expandedClass + '" data-ng-show="node.' + nodeChildren + ' && node.collapsed === false" data-ng-click="' + treeId + '.selectNodeHead(node, $event)"></i>' +
+                        '<i class="' + normalClass + '" data-ng-show="!node.' + nodeChildren + ' && ' + showLeafs + '"></i> ' +
+                        '<span data-ng-class="node.selected" data-ng-click="' + treeId + '.selectNodeLabel(node, $event)" ng-if="' + showLeafs + '  && !node.' + nodeChildren + '">{{node.' + nodeLabel + '}}</span>' +
+                        '<span data-ng-class="node.selected" data-ng-click="' + treeId + '.selectNodeLabel(node, $event)" ng-if="node.' + nodeChildren + '">{{node.' + nodeLabel + '}}</span>' +
+                        '<div data-ng-hide="node.collapsed" data-use-select-node-fn="' + attrs.useSelectNodeFn + '" data-collapsed-class="' + collapsedClass + '" data-expanded-class="' + expandedClass + '" data-normal-class="' + normalClass + '" data-show-leafs="' + showLeafs + '" droppable="' + droppable + '" ' + dropArg + ' data-tree-id="' + treeId + '" data-tree-model="node.' + nodeChildren + '" data-node-id=' + nodeId + ' data-node-label=' + nodeLabel + ' data-node-children=' + nodeChildren + '  ng-switch-when="false"></div>' +
                         '</li>' +
                         '</ul>';
 
@@ -83,19 +96,22 @@
                             //create tree object if not exists
                             scope[treeId] = scope[treeId] || {};
 
-                            //if node head clicks,
-                            scope[treeId].selectNodeHead = scope[treeId].selectNodeHead || function (selectedNode) {
+                            // node head click function
+                            var selectNodeHeadFn = scope[treeId].selectNodeHead || function (selectedNode, event) {
 
                                 //Collapse or Expand
-                                selectedNode.collapsed = !selectedNode.collapsed;
+                                if (selectedNode.collapsed === undefined)
+                                    selectedNode.collapsed = false;
+                                else
+                                    selectedNode.collapsed = !selectedNode.collapsed;
 
                                 if (angular.isFunction(scope[treeId].treeSelectNodeHeadCallBack)) {
                                     scope[treeId].treeSelectNodeHeadCallBack(selectedNode);
                                 }
                             };
 
-                            //if node label clicks,
-                            scope[treeId].selectNodeLabel = scope[treeId].selectNodeLabel || function (selectedNode) {
+                            // node label click function
+                            var selectNodeLabelFn = scope[treeId].selectNodeLabel || function (selectedNode, event) {
 
                                 //remove highlight from previous node
                                 if (scope[treeId].currentNode && scope[treeId].currentNode.selected) {
@@ -114,6 +130,41 @@
                                 }
 
                             };
+
+
+                            //if node clicks, (<li>)
+                            if (!useSelectNodeFn)
+                                scope[treeId].selectNode = null;
+                            else
+                                scope[treeId].selectNode = scope[treeId].selectNode || function (selectedNode, event) {
+
+                                    event.stopPropagation();
+
+                                    //call node head click
+                                    selectNodeHeadFn(selectedNode);
+
+                                    //call node label click
+                                    selectNodeLabelFn(selectedNode);
+
+
+                                    if (angular.isFunction(scope[treeId].treeSelectNodeCallBack)) {
+                                        scope[treeId].treeSelectNodeCallBack(selectedNode);
+                                    }
+                                };
+
+                            //if node head clicks, (<i>)
+                            if (!useSelectNodeFn)
+                                scope[treeId].selectNodeHead = selectNodeHeadFn;
+                            else
+                                scope[treeId].selectNodeHead = null;
+
+
+                            //if node label clicks, (<span>)
+                            if (!useSelectNodeFn)
+                                scope[treeId].selectNodeLabel = selectNodeLabelFn;
+                            else
+                                scope[treeId].selectNodeLabel = null;
+
 
                             scope[treeId].onDrop = scope[treeId].onDrop || function ($data, node, nodeId) {
                                 if (attrs.onDrop) {
